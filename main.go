@@ -229,8 +229,8 @@ func main() {
 	// ********************************************************************************
 
 	vrfOptions := []vrf.Option{
-		vrf.WithSharedMapV4(vrf.NewMap()),
-		vrf.WithSharedMapV6(vrf.NewMap()),
+		vrf.WithSharedMap(vrf.NewMap()),
+		vrf.WithLoadInterface(loopback.Load),
 	}
 	loopOptions := []loopback.Option{
 		loopback.WithSharedMap(loopback.NewMap()),
@@ -408,7 +408,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			up.NewClient(ctx, vppConn),
 			mtu.NewClient(vppConn),
 			routes.NewClient(vppConn),
-			unnumbered.NewClient(vppConn),
+			unnumbered.NewClient(vppConn, loopback.Load),
 			vrf.NewClient(vppConn, vrfOpts...),
 			memif.NewClient(vppConn),
 			sendfd.NewClient(),
@@ -431,7 +431,7 @@ func createVl3Endpoint(ctx context.Context, config *Config, vppConn vpphelper.Co
 			vl3.NewServer(ctx, prefixCh),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
-			unnumbered.NewServer(vppConn),
+			unnumbered.NewServer(vppConn, loopback.Load),
 			vrf.NewServer(vppConn, vrfOpts...),
 			loopback.NewServer(vppConn, loopOpts...),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
