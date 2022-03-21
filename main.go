@@ -61,6 +61,7 @@ import (
 
 	"github.com/networkservicemesh/api/pkg/api/ipam"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
 
@@ -79,14 +80,13 @@ import (
 
 // Config holds configuration parameters from environment variables
 type Config struct {
-	Name                  string            `default:"icmp-server" desc:"Name of ICMP Server"`
+	Name                  string            `default:"vL3-server" desc:"Name of vL3 Server"`
 	DialTimeout           time.Duration     `default:"5s" desc:"timeout to dial NSMgr" split_words:"true"`
 	RequestTimeout        time.Duration     `default:"15s" desc:"timeout to request NSE" split_words:"true"`
 	ListenOn              string            `default:"listen.on.sock" desc:"listen on socket" split_words:"true"`
 	ConnectTo             url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
-	ServiceNames          []string          `default:"icmp-responder" desc:"Name of providing service" split_words:"true"`
-	Payload               string            `default:"IP" desc:"Name of provided service payload" split_words:"true"`
+	ServiceNames          []string          `default:"vL3" desc:"Name of providing service" split_words:"true"`
 	Labels                map[string]string `default:"" desc:"Endpoint labels"`
 	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
@@ -273,7 +273,7 @@ func main() {
 			nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, &config.ConnectTo, registryclient.WithDialOptions(clientOptions...))
 			_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
 				Name:    serviceName,
-				Payload: config.Payload,
+				Payload: payload.IP,
 			})
 			if err != nil {
 				log.FromContext(ctx).Fatalf("unable to register ns %+v", err)
@@ -350,7 +350,7 @@ func main() {
 			Connection: &networkservice.Connection{
 				NetworkServiceEndpointName: nse.Name,
 				NetworkService:             nsName,
-				Payload:                    config.Payload,
+				Payload:                    payload.IP,
 			},
 		}
 
