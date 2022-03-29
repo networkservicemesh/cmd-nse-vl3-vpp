@@ -9,6 +9,7 @@ import (
 	_ "github.com/kelseyhightower/envconfig"
 	_ "github.com/networkservicemesh/api/pkg/api/ipam"
 	_ "github.com/networkservicemesh/api/pkg/api/networkservice"
+	_ "github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	_ "github.com/networkservicemesh/api/pkg/api/registry"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/ipaddress"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/routes"
