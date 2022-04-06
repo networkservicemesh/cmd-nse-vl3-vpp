@@ -258,7 +258,6 @@ func main() {
 		),
 	)
 
-	nsName := config.ServiceNames[0]
 	nseRegistryClient := registryclient.NewNetworkServiceEndpointRegistryClient(
 		ctx,
 		&config.ConnectTo,
@@ -321,7 +320,7 @@ func main() {
 
 	nseStream, err := nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
 		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
-			NetworkServiceNames: []string{nsName},
+			NetworkServiceNames: config.ServiceNames,
 		},
 	})
 	if err != nil {
@@ -349,7 +348,7 @@ func main() {
 		request := &networkservice.NetworkServiceRequest{
 			Connection: &networkservice.Connection{
 				NetworkServiceEndpointName: nse.Name,
-				NetworkService:             nsName,
+				NetworkService:             config.ServiceNames[0],
 				Payload:                    payload.IP,
 			},
 		}
