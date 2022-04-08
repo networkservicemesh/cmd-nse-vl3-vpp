@@ -26,6 +26,7 @@ import (
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
+	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
