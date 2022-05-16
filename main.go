@@ -42,6 +42,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
@@ -89,6 +90,7 @@ type Config struct {
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
 	ServiceNames          []string          `default:"vL3" desc:"Name of providing service" split_words:"true"`
 	Labels                map[string]string `default:"" desc:"Endpoint labels"`
+	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	PrefixServerURL       url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server"`
@@ -299,7 +301,7 @@ func main() {
 	var closeAll = func() {
 		close(subscribedChannels[0])
 	}
-	server := createVl3Endpoint(ctx, config, vppConn, source, loopOptions, vrfOptions, subscribedChannels[0])
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, source, loopOptions, vrfOptions, subscribedChannels[0])
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -424,13 +426,14 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 	return retry.NewClient(c)
 }
 
-func createVl3Endpoint(ctx context.Context, config *Config, vppConn vpphelper.Connection,
+func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection,
 	source *workloadapi.X509Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
 		endpoint.WithAuthorizeServer(authorize.NewServer()),
 		endpoint.WithAdditionalFunctionality(
+			onidle.NewServer(ctx, cancel, config.IdleTimeout),
 			vl3.NewServer(ctx, prefixCh),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
