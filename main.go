@@ -58,6 +58,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -389,7 +390,7 @@ func main() {
 	<-vppErrCh
 }
 
-func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source *workloadapi.X509Source,
+func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
 	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) networkservice.NetworkServiceClient {
 	dialOptions := append(tracing.WithTracingDial(),
 		grpcfd.WithChainStreamInterceptor(),
@@ -433,7 +434,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 }
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
-	source *workloadapi.X509Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
+	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
