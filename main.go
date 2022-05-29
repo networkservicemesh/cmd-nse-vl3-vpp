@@ -21,6 +21,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -57,6 +58,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -107,13 +109,13 @@ func (c *Config) Process() error {
 	return nil
 }
 
-func startListenPrefixes(ctx context.Context, c *Config, source *workloadapi.X509Source, subscriptions []chan *ipam.PrefixResponse) {
+func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, subscriptions []chan *ipam.PrefixResponse) {
 	var previousResponse *ipam.PrefixResponse
 	go func() {
 		for ctx.Err() == nil {
 			cc, err := grpc.DialContext(ctx, grpcutils.URLToTarget(&c.PrefixServerURL), grpc.WithTransportCredentials(
 				credentials.NewTLS(
-					tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny()),
+					tlsClientConfig,
 				),
 			))
 			if err != nil {
@@ -227,6 +229,11 @@ func main() {
 	}
 	log.FromContext(ctx).Infof("SVID: %q", svid.ID)
 
+	tlsClientConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny())
+	tlsClientConfig.MinVersion = tls.VersionTLS12
+	tlsServerConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
+	tlsServerConfig.MinVersion = tls.VersionTLS12
+
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: prepare shared between client and server resources")
 	// ********************************************************************************
@@ -255,7 +262,7 @@ func main() {
 		grpc.WithTransportCredentials(
 			grpcfd.TransportCredentials(
 				credentials.NewTLS(
-					tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny()),
+					tlsClientConfig,
 				),
 			),
 		),
@@ -301,7 +308,7 @@ func main() {
 	var closeAll = func() {
 		close(subscribedChannels[0])
 	}
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, source, loopOptions, vrfOptions, subscribedChannels[0])
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0])
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -337,7 +344,7 @@ func main() {
 		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	}
 
-	startListenPrefixes(ctx, config, source, subscribedChannels)
+	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
 
 	for i, nse := range nseList {
 		index := i + 1
@@ -347,7 +354,7 @@ func main() {
 		if nse.GetInitialRegistrationTime().AsTime().Local().After(nseRegistration.GetInitialRegistrationTime().AsTime().Local()) {
 			continue
 		}
-		vl3Client := createVl3Client(ctx, config, vppConn, source, loopOptions, vrfOptions, subscribedChannels[index])
+		vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[index])
 		log.FromContext(ctx).Infof("connect to %v", nse.String())
 
 		request := &networkservice.NetworkServiceRequest{
@@ -383,7 +390,7 @@ func main() {
 	<-vppErrCh
 }
 
-func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, source *workloadapi.X509Source,
+func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
 	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) networkservice.NetworkServiceClient {
 	dialOptions := append(tracing.WithTracingDial(),
 		grpcfd.WithChainStreamInterceptor(),
@@ -395,7 +402,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		grpc.WithTransportCredentials(
 			grpcfd.TransportCredentials(
 				credentials.NewTLS(
-					tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny()),
+					tlsClientConfig,
 				),
 			),
 		),
@@ -426,8 +433,8 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 	return retry.NewClient(c)
 }
 
-func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection,
-	source *workloadapi.X509Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
+func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
+	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
@@ -458,7 +465,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 		grpc.Creds(
 			grpcfd.TransportCredentials(
 				credentials.NewTLS(
-					tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny()),
+					tlsServerConfig,
 				),
 			),
 		),

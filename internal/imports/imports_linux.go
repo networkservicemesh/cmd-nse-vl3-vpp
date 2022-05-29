@@ -3,6 +3,7 @@ package imports
 
 import (
 	_ "context"
+	_ "crypto/tls"
 	_ "github.com/antonfisher/nested-logrus-formatter"
 	_ "github.com/edwarnicke/grpcfd"
 	_ "github.com/edwarnicke/vpphelper"
@@ -44,6 +45,7 @@ import (
 	_ "github.com/pkg/errors"
 	_ "github.com/sirupsen/logrus"
 	_ "github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	_ "github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	_ "github.com/spiffe/go-spiffe/v2/workloadapi"
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
