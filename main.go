@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -45,6 +46,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
@@ -96,6 +98,8 @@ type Config struct {
 	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	PrefixServerURL       url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server"`
+	DomainNamingTemplates []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}" desc:"Represents domain naming templates in go-template format. Gets on input networkservice.Connection"`
+	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -112,7 +116,7 @@ func (c *Config) Process() error {
 func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, subscriptions []chan *ipam.PrefixResponse) {
 	var previousResponse *ipam.PrefixResponse
 	go func() {
-		for ctx.Err() == nil {
+		for ; ctx.Err() == nil; time.Sleep(time.Millisecond * 200) {
 			cc, err := grpc.DialContext(ctx, grpcutils.URLToTarget(&c.PrefixServerURL), grpc.WithTransportCredentials(
 				credentials.NewTLS(
 					tlsClientConfig,
@@ -120,14 +124,12 @@ func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Co
 			))
 			if err != nil {
 				logrus.Error(err.Error())
-				time.Sleep(time.Millisecond * 200)
 				continue
 			}
 
 			managePrefixClient, err := ipam.NewIPAMClient(cc).ManagePrefixes(ctx)
 			if err != nil {
 				logrus.Error(err.Error())
-				time.Sleep(time.Millisecond * 200)
 				continue
 			}
 
@@ -139,7 +141,6 @@ func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Co
 			err = managePrefixClient.Send(request)
 
 			if err != nil {
-				time.Sleep(time.Millisecond * 200)
 				continue
 			}
 
@@ -167,8 +168,6 @@ func main() {
 	// ********************************************************************************
 	// setup logging
 	// ********************************************************************************
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetFormatter(&nested.Formatter{})
 	ctx = log.WithLog(ctx, logruslogger.New(ctx, map[string]interface{}{"cmd": os.Args[0]}))
 
 	if err := debug.Self(); err != nil {
@@ -188,6 +187,13 @@ func main() {
 		logrus.Fatal(err.Error())
 	}
 
+	level, err := logrus.ParseLevel(config.LogLevel)
+	if err != nil {
+		logrus.Fatalf("invalid log level %s", config.LogLevel)
+	}
+	logrus.SetLevel(level)
+	logrus.SetFormatter(&nested.Formatter{})
+
 	// ********************************************************************************
 	// Configure Open Telemetry
 	// ********************************************************************************
@@ -197,7 +203,7 @@ func main() {
 		metricExporter := opentelemetry.InitMetricExporter(ctx, collectorAddress)
 		o := opentelemetry.Init(ctx, spanExporter, metricExporter, config.Name)
 		defer func() {
-			if err := o.Close(); err != nil {
+			if err = o.Close(); err != nil {
 				logrus.Error(err.Error())
 			}
 		}()
@@ -304,11 +310,30 @@ func main() {
 	// ********************************************************************************
 
 	var subscribedChannels []chan *ipam.PrefixResponse
+
 	subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	var closeAll = func() {
 		close(subscribedChannels[0])
 	}
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0])
+
+	nseStream, err := nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
+		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
+			NetworkServiceNames: config.ServiceNames,
+		},
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
+	}
+	nseList := registryapi.ReadNetworkServiceEndpointList(nseStream)
+
+	for i := 0; i < len(nseList); i++ {
+		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
+	}
+
+	var initialDNSFanoutList = make([]url.URL, len(nseList))
+
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0], initialDNSFanoutList)
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -328,20 +353,6 @@ func main() {
 
 	if err != nil {
 		log.FromContext(ctx).Fatalf("unable to register nse %+v", err)
-	}
-
-	nseStream, err := nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
-		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
-			NetworkServiceNames: config.ServiceNames,
-		},
-	})
-	if err != nil {
-		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
-	}
-	nseList := registryapi.ReadNetworkServiceEndpointList(nseStream)
-
-	for i := 0; i < len(nseList); i++ {
-		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	}
 
 	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
@@ -372,6 +383,13 @@ func main() {
 		if err != nil {
 			log.FromContext(ctx).Errorf("request has failed: %v", err.Error())
 			continue
+		}
+
+		for _, config := range conn.Context.GetDnsContext().GetConfigs() {
+			for _, nameserverAddress := range config.DnsServerIps {
+				initialDNSFanoutList[i] = url.URL{Scheme: "tcp", Host: fmt.Sprintf("%v:53", nameserverAddress)}
+				log.FromContext(ctx).Infof("Added dns server to fanout: %v", initialDNSFanoutList[i])
+			}
 		}
 
 		prevClose := closeAll
@@ -434,7 +452,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 }
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
-	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
+	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse, initialDNSFanoutList []url.URL) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
@@ -442,6 +460,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 		endpoint.WithAdditionalFunctionality(
 			onidle.NewServer(ctx, cancel, config.IdleTimeout),
 			vl3.NewServer(ctx, prefixCh),
+			vl3dns.NewServer(ctx, vl3dns.WithDomainSchemes(config.DomainNamingTemplates...), vl3dns.WithInitialFanoutList(initialDNSFanoutList)),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			unnumbered.NewServer(vppConn, loopback.Load),
