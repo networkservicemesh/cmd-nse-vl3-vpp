@@ -4,6 +4,7 @@ package imports
 import (
 	_ "context"
 	_ "crypto/tls"
+	_ "fmt"
 	_ "github.com/antonfisher/nested-logrus-formatter"
 	_ "github.com/edwarnicke/grpcfd"
 	_ "github.com/edwarnicke/vpphelper"
@@ -30,6 +31,7 @@ import (
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
+	_ "github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 	_ "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
