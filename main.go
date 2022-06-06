@@ -316,17 +316,6 @@ func main() {
 		close(subscribedChannels[0])
 	}
 
-	nseStream, err := nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
-		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
-			NetworkServiceNames: config.ServiceNames,
-		},
-	})
-
-	if err != nil {
-		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
-	}
-	nseList := registryapi.ReadNetworkServiceEndpointList(nseStream)
-
 	var initialDNSFanoutList = make([]url.URL, 0, 32)
 
 	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0], initialDNSFanoutList)
@@ -352,7 +341,7 @@ func main() {
 	}
 
 	// Update the nseList to make sure we have all registered vl3-endpoints
-	nseStream, err = nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
+	nseStream, err := nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
 		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
 			NetworkServiceNames: config.ServiceNames,
 		},
@@ -361,7 +350,7 @@ func main() {
 	if err != nil {
 		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
 	}
-	nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
+	var nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
 
 	for i := 0; i < len(nseList); i++ {
 		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
