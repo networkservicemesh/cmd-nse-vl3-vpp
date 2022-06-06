@@ -357,6 +357,18 @@ func main() {
 
 	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
 
+	// Update the nseList to make sure we have all registered vl3-endpoints
+	nseStream, err = nseRegistryClient.Find(ctx, &registryapi.NetworkServiceEndpointQuery{
+		NetworkServiceEndpoint: &registryapi.NetworkServiceEndpoint{
+			NetworkServiceNames: config.ServiceNames,
+		},
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
+	}
+	nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
+
 	for i, nse := range nseList {
 		index := i + 1
 		if nse.Name == config.Name {
