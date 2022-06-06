@@ -327,7 +327,7 @@ func main() {
 	}
 	nseList := registryapi.ReadNetworkServiceEndpointList(nseStream)
 
-	var initialDNSFanoutList = make([]url.URL, len(nseList))
+	var initialDNSFanoutList = make([]url.URL, 0, 32)
 
 	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0], initialDNSFanoutList)
 
@@ -362,8 +362,6 @@ func main() {
 		log.FromContext(ctx).Fatalf("error getting nses: %+v", err)
 	}
 	nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
-
-	initialDNSFanoutList = make([]url.URL, len(nseList))
 
 	for i := 0; i < len(nseList); i++ {
 		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
@@ -400,8 +398,8 @@ func main() {
 
 		for _, config := range conn.Context.GetDnsContext().GetConfigs() {
 			for _, nameserverAddress := range config.DnsServerIps {
-				initialDNSFanoutList[i] = url.URL{Scheme: "tcp", Host: fmt.Sprintf("%v:53", nameserverAddress)}
-				log.FromContext(ctx).Infof("Added dns server to fanout: %v", initialDNSFanoutList[i])
+				initialDNSFanoutList = append(initialDNSFanoutList, url.URL{Scheme: "tcp", Host: fmt.Sprintf("%v:53", nameserverAddress)})
+				log.FromContext(ctx).Infof("Added dns server to fanout: %v", initialDNSFanoutList[len(initialDNSFanoutList)-1])
 			}
 		}
 
