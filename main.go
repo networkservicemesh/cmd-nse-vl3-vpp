@@ -363,6 +363,8 @@ func main() {
 	}
 	nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
 
+	initialDNSFanoutList = make([]url.URL, len(nseList))
+
 	for i := 0; i < len(nseList); i++ {
 		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	}
