@@ -169,6 +169,12 @@ func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Co
 	}()
 }
 
+const (
+	serverSubscriptionIdx = iota
+	clientSubscriptionIdx
+	totalSubscriptions
+)
+
 func main() {
 	// ********************************************************************************
 	// setup context to catch signals
@@ -340,13 +346,17 @@ func main() {
 	// ********************************************************************************
 
 	var subscribedChannels []chan *ipam.PrefixResponse
-
-	subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
-	var closeAll = func() {
-		close(subscribedChannels[0])
+	for i := 0; i < totalSubscriptions; i++ {
+		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	}
+	var closeSubscribedChannels = func() {
+		for i := 0; i < totalSubscriptions; i++ {
+			close(subscribedChannels[i])
+		}
+	}
+	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
 
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0])
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[serverSubscriptionIdx])
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -380,11 +390,6 @@ func main() {
 	}
 	var nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
 
-	for i := 0; i < len(nseList); i++ {
-		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
-	}
-	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
-
 	requestCtx, cancelRequest := context.WithTimeout(signalCtx, config.RequestTimeout)
 	defer cancelRequest()
 
@@ -409,15 +414,15 @@ func main() {
 
 	dnsServerIP.Store(conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP)
 
-	for i, nse := range nseList {
-		index := i + 1
+	vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[clientSubscriptionIdx])
+	for _, nse := range nseList {
 		if nse.Name == config.Name {
 			continue
 		}
 		if nse.GetInitialRegistrationTime().AsTime().Local().After(nseRegistration.GetInitialRegistrationTime().AsTime().Local()) {
 			continue
 		}
-		vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[index])
+
 		log.FromContext(ctx).Infof("connect to %v", nse.String())
 
 		request := &networkservice.NetworkServiceRequest{
@@ -437,19 +442,16 @@ func main() {
 			continue
 		}
 
-		prevClose := closeAll
-		closeAll = func() {
-			close(subscribedChannels[index])
+		defer func() {
 			closeCtx, cancelClose := context.WithTimeout(ctx, config.RequestTimeout)
 			defer cancelClose()
 			_, _ = vl3Client.Close(closeCtx, conn)
-			prevClose()
-		}
+		}()
 	}
 
 	// wait for server to exit
 	<-signalCtx.Done()
-	closeAll()
+	closeSubscribedChannels()
 	<-vppErrCh
 }
 
