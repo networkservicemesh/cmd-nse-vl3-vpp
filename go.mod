@@ -17,6 +17,8 @@ require (
 	google.golang.org/protobuf v1.27.1
 )
 
+replace github.com/networkservicemesh/sdk => github.com/denis-tingaikin/sdk v0.0.0-20220710232041-6f8a30e5811d
+
 require (
 	git.fd.io/govpp.git v0.3.6-0.20210927044411-385ccc0d8ba9 // indirect
 	github.com/OneOfOne/xxhash v1.2.3 // indirect
