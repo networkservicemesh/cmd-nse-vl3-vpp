@@ -22,12 +22,13 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -37,18 +38,22 @@ import (
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/routes"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/unnumbered"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/mtu"
+
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
-	"github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+
+	registryclientinfo "github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
 	"github.com/networkservicemesh/sdk/pkg/tools/token"
@@ -72,11 +77,12 @@ import (
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
 
+	kernelsdk "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/kernel"
+
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/authorize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
@@ -99,8 +105,10 @@ type Config struct {
 	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	PrefixServerURL       url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server"`
-	DomainNamingTemplates []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}" desc:"Represents domain naming templates in go-template format. Gets on input networkservice.Connection"`
+	DNSTemplates          []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
+	getDNSServerIP        func() net.IP
+	dnsConfigs            vl3dns.Map
 }
 
 // Process prints and processes env to config
@@ -195,6 +203,10 @@ func main() {
 	logrus.SetLevel(level)
 	logrus.SetFormatter(&nested.Formatter{})
 
+	var dnsServerIP = new(atomic.Value)
+	dnsServerIP.Store(net.IP(nil))
+	config.getDNSServerIP = func() net.IP { return dnsServerIP.Load().(net.IP) }
+
 	// ********************************************************************************
 	// Configure Open Telemetry
 	// ********************************************************************************
@@ -275,12 +287,27 @@ func main() {
 		),
 	)
 
+	nsmClient := retry.NewClient(
+		client.NewClient(ctx,
+			client.WithClientURL(&config.ConnectTo),
+			client.WithName(config.Name+"-kernel"),
+			client.WithAuthorizeClient(authorize.NewClient()),
+			client.WithAdditionalFunctionality(
+				clientinfo.NewClient(),
+				kernelsdk.NewClient(),
+				sendfd.NewClient(),
+			),
+			client.WithDialTimeout(config.DialTimeout),
+			client.WithDialOptions(clientOptions...),
+		),
+	)
+
 	nseRegistryClient := registryclient.NewNetworkServiceEndpointRegistryClient(
 		ctx,
 		registryclient.WithClientURL(&config.ConnectTo),
 		registryclient.WithDialOptions(clientOptions...),
 		registryclient.WithNSEAdditionalFunctionality(
-			clientinfo.NewNetworkServiceEndpointRegistryClient(),
+			registryclientinfo.NewNetworkServiceEndpointRegistryClient(),
 			registrysendfd.NewNetworkServiceEndpointRegistryClient(),
 		),
 	)
@@ -318,9 +345,7 @@ func main() {
 		close(subscribedChannels[0])
 	}
 
-	var initialDNSFanoutList = make([]url.URL, 0, 32)
-
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0], initialDNSFanoutList)
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0])
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -359,6 +384,30 @@ func main() {
 	}
 	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
 
+	requestCtx, cancelRequest := context.WithTimeout(signalCtx, config.RequestTimeout)
+	defer cancelRequest()
+
+	conn, err := nsmClient.Request(requestCtx, &networkservice.NetworkServiceRequest{
+		Connection: &networkservice.Connection{
+			Id:                         config.Name + "-kernel",
+			NetworkServiceEndpointName: config.Name,
+			NetworkService:             config.ServiceNames[0],
+			Payload:                    payload.IP,
+		},
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Fatal(err.Error())
+	}
+
+	defer func(conn *networkservice.Connection) {
+		closeCtx, cancelClose := context.WithTimeout(ctx, config.RequestTimeout)
+		defer cancelClose()
+		_, _ = nsmClient.Close(closeCtx, conn)
+	}(conn)
+
+	dnsServerIP.Store(conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP)
+
 	for i, nse := range nseList {
 		index := i + 1
 		if nse.Name == config.Name {
@@ -378,20 +427,13 @@ func main() {
 			},
 		}
 
-		requestCtx, cancelRequest := context.WithTimeout(signalCtx, config.RequestTimeout)
+		requestCtx, cancelRequest = context.WithTimeout(signalCtx, config.RequestTimeout)
 		defer cancelRequest()
 
 		conn, err := vl3Client.Request(requestCtx, request)
 		if err != nil {
 			log.FromContext(ctx).Errorf("request has failed: %v", err.Error())
 			continue
-		}
-
-		for _, config := range conn.Context.GetDnsContext().GetConfigs() {
-			for _, nameserverAddress := range config.DnsServerIps {
-				initialDNSFanoutList = append(initialDNSFanoutList, url.URL{Scheme: "tcp", Host: fmt.Sprintf("%v:53", nameserverAddress)})
-				log.FromContext(ctx).Infof("Added dns server to fanout: %v", initialDNSFanoutList[len(initialDNSFanoutList)-1])
-			}
 		}
 
 		prevClose := closeAll
@@ -433,6 +475,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithName(config.Name),
 		client.WithAdditionalFunctionality(
 			vl3.NewClient(ctx, prefixCh),
+			vl3dns.NewClient(config.getDNSServerIP(), &config.dnsConfigs),
 			up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			loopback.NewClient(vppConn, loopOpts...),
@@ -454,15 +497,19 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 }
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
-	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse, initialDNSFanoutList []url.URL) *grpc.Server {
+	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
 		endpoint.WithAuthorizeServer(authorize.NewServer()),
 		endpoint.WithAdditionalFunctionality(
 			onidle.NewServer(ctx, cancel, config.IdleTimeout),
+			vl3dns.NewServer(ctx,
+				config.getDNSServerIP,
+				vl3dns.WithDomainSchemes(config.DNSTemplates...),
+				vl3dns.WithConfigs(&config.dnsConfigs),
+			),
 			vl3.NewServer(ctx, prefixCh),
-			vl3dns.NewServer(ctx, vl3dns.WithDomainSchemes(config.DomainNamingTemplates...), vl3dns.WithInitialFanoutList(initialDNSFanoutList)),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			unnumbered.NewServer(vppConn, loopback.Load),
