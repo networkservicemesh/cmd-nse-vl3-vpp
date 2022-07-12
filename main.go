@@ -387,7 +387,7 @@ func main() {
 	requestCtx, cancelRequest := context.WithTimeout(signalCtx, config.RequestTimeout)
 	defer cancelRequest()
 
-	conn, err := nsmClient.Request(ctx, &networkservice.NetworkServiceRequest{
+	conn, err := nsmClient.Request(requestCtx, &networkservice.NetworkServiceRequest{
 		Connection: &networkservice.Connection{
 			Id:                         config.Name + "-kernel",
 			NetworkServiceEndpointName: config.Name,
@@ -399,6 +399,12 @@ func main() {
 	if err != nil {
 		log.FromContext(ctx).Fatal(err.Error())
 	}
+
+	defer func(conn *networkservice.Connection) {
+		closeCtx, cancelClose := context.WithTimeout(ctx, config.RequestTimeout)
+		defer cancelClose()
+		_, _ = nsmClient.Close(closeCtx, conn)
+	}(conn)
 
 	dnsServerIP.Store(conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP)
 

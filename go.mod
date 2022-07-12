@@ -7,8 +7,8 @@ require (
 	github.com/edwarnicke/grpcfd v1.1.2
 	github.com/edwarnicke/vpphelper v0.0.0-20210225052320-b4f1f1aff45d
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/networkservicemesh/api v1.4.1-0.20220705145838-0b96f94a2adb
-	github.com/networkservicemesh/sdk v0.5.1-0.20220706093325-9d885cffbc5c
+	github.com/networkservicemesh/api v1.4.1-0.20220711153918-a59689088578
+	github.com/networkservicemesh/sdk v0.5.1-0.20220711213025-454062d8cea6
 	github.com/networkservicemesh/sdk-vpp v0.0.0-20220706094402-72181b4b3611
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
@@ -16,8 +16,6 @@ require (
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
 )
-
-replace github.com/networkservicemesh/sdk => github.com/denis-tingaikin/sdk v0.0.0-20220710232041-6f8a30e5811d
 
 require (
 	git.fd.io/govpp.git v0.3.6-0.20210927044411-385ccc0d8ba9 // indirect
