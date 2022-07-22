@@ -49,8 +49,10 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/upstreamrefresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/mtu/vl3mtu"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 
 	registryclientinfo "github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
@@ -168,6 +170,12 @@ func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Co
 		}
 	}()
 }
+
+const (
+	serverSubscriptionIdx = iota
+	clientSubscriptionIdx
+	totalSubscriptions
+)
 
 func main() {
 	// ********************************************************************************
@@ -288,15 +296,22 @@ func main() {
 		),
 	)
 
+	clientAdditionalFunctionality := []networkservice.NetworkServiceClient{
+		upstreamrefresh.NewClient(ctx, upstreamrefresh.WithLocalNotifications()),
+		vl3mtu.NewClient(),
+	}
 	nsmClient := retry.NewClient(
 		client.NewClient(ctx,
 			client.WithClientURL(&config.ConnectTo),
 			client.WithName(config.Name+"-kernel"),
 			client.WithAuthorizeClient(authorize.NewClient()),
 			client.WithAdditionalFunctionality(
-				clientinfo.NewClient(),
-				kernelsdk.NewClient(),
-				sendfd.NewClient(),
+				append(
+					clientAdditionalFunctionality,
+					clientinfo.NewClient(),
+					kernelsdk.NewClient(),
+					sendfd.NewClient(),
+				)...,
 			),
 			client.WithDialTimeout(config.DialTimeout),
 			client.WithDialOptions(clientOptions...),
@@ -340,13 +355,17 @@ func main() {
 	// ********************************************************************************
 
 	var subscribedChannels []chan *ipam.PrefixResponse
-
-	subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
-	var closeAll = func() {
-		close(subscribedChannels[0])
+	for i := 0; i < totalSubscriptions; i++ {
+		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
 	}
+	var closeSubscribedChannels = func() {
+		for i := 0; i < totalSubscriptions; i++ {
+			close(subscribedChannels[i])
+		}
+	}
+	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
 
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[0])
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[serverSubscriptionIdx])
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -380,11 +399,6 @@ func main() {
 	}
 	var nseList = registryapi.ReadNetworkServiceEndpointList(nseStream)
 
-	for i := 0; i < len(nseList); i++ {
-		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
-	}
-	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
-
 	requestCtx, cancelRequest := context.WithTimeout(signalCtx, config.RequestTimeout)
 	defer cancelRequest()
 
@@ -409,15 +423,15 @@ func main() {
 
 	dnsServerIP.Store(conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP)
 
-	for i, nse := range nseList {
-		index := i + 1
+	vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[clientSubscriptionIdx], clientAdditionalFunctionality...)
+	for _, nse := range nseList {
 		if nse.Name == config.Name {
 			continue
 		}
 		if nse.GetInitialRegistrationTime().AsTime().Local().After(nseRegistration.GetInitialRegistrationTime().AsTime().Local()) {
 			continue
 		}
-		vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[index])
+
 		log.FromContext(ctx).Infof("connect to %v", nse.String())
 
 		request := &networkservice.NetworkServiceRequest{
@@ -437,24 +451,21 @@ func main() {
 			continue
 		}
 
-		prevClose := closeAll
-		closeAll = func() {
-			close(subscribedChannels[index])
+		defer func() {
 			closeCtx, cancelClose := context.WithTimeout(ctx, config.RequestTimeout)
 			defer cancelClose()
 			_, _ = vl3Client.Close(closeCtx, conn)
-			prevClose()
-		}
+		}()
 	}
 
 	// wait for server to exit
 	<-signalCtx.Done()
-	closeAll()
+	closeSubscribedChannels()
 	<-vppErrCh
 }
 
 func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
-	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) networkservice.NetworkServiceClient {
+	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse, clientAdditionalFunctionality ...networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
 	dialOptions := append(tracing.WithTracingDial(),
 		grpcfd.WithChainStreamInterceptor(),
 		grpcfd.WithChainUnaryInterceptor(),
@@ -475,19 +486,22 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithClientURL(&config.ConnectTo),
 		client.WithName(config.Name),
 		client.WithAdditionalFunctionality(
-			vl3.NewClient(ctx, prefixCh),
-			vl3dns.NewClient(config.getDNSServerIP(), &config.dnsConfigs),
-			up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
-			ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
-			loopback.NewClient(vppConn, loopOpts...),
-			up.NewClient(ctx, vppConn),
-			mtu.NewClient(vppConn),
-			routes.NewClient(vppConn),
-			unnumbered.NewClient(vppConn, loopback.Load),
-			vrf.NewClient(vppConn, vrfOpts...),
-			memif.NewClient(vppConn),
-			sendfd.NewClient(),
-			recvfd.NewClient(),
+			append(
+				clientAdditionalFunctionality,
+				vl3.NewClient(ctx, prefixCh),
+				vl3dns.NewClient(config.getDNSServerIP(), &config.dnsConfigs),
+				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
+				ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
+				loopback.NewClient(vppConn, loopOpts...),
+				up.NewClient(ctx, vppConn),
+				mtu.NewClient(vppConn),
+				routes.NewClient(vppConn),
+				unnumbered.NewClient(vppConn, loopback.Load),
+				vrf.NewClient(vppConn, vrfOpts...),
+				memif.NewClient(vppConn),
+				sendfd.NewClient(),
+				recvfd.NewClient(),
+			)...,
 		),
 		client.WithHealClient(null.NewClient()),
 		client.WithDialTimeout(config.DialTimeout),
@@ -510,6 +524,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 				vl3dns.WithDomainSchemes(config.DNSTemplates...),
 				vl3dns.WithConfigs(&config.dnsConfigs),
 			),
+			vl3mtu.NewServer(),
 			vl3.NewServer(ctx, prefixCh),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
