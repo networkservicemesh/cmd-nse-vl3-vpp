@@ -213,8 +213,12 @@ func main() {
 	logrus.SetFormatter(&nested.Formatter{})
 
 	var dnsServerIP = new(atomic.Value)
-	dnsServerIP.Store(net.IP(nil))
-	config.getDNSServerIP = func() net.IP { return dnsServerIP.Load().(net.IP) }
+	config.getDNSServerIP = func() net.IP {
+		if ip := dnsServerIP.Load(); ip != nil {
+			return ip.(net.IP)
+		}
+		return nil
+	}
 
 	// ********************************************************************************
 	// Configure Open Telemetry
