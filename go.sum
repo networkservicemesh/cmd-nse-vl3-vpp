@@ -167,6 +167,7 @@ github.com/google/go-cmp v0.5.1/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
+github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/martian v2.1.0+incompatible/go.mod h1:9I4somxYTbIHy5NJKHRl3wXiIaQGbYVAs8BPL6v8lEs=
 github.com/google/martian/v3 v3.0.0/go.mod h1:y5Zk1BBys9G+gd6Jrk0W3cC1+ELVxBWuIGO+w/tUAp0=
 github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57/go.mod h1:zfwlbNMJ+OItoe0UupaVj+oy1omPYYDuagoSzA8v9mc=
@@ -223,12 +224,12 @@ github.com/miekg/dns v1.1.50/go.mod h1:e3IlAVfNqAllflbibAZEWOXOQ+Ynzk/dDozDxY7Xn
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721/go.mod h1:Ickgr2WtCLZ2MDGd4Gr0geeCH5HybhRJbonOgQpvSxc=
 github.com/networkservicemesh/api v1.6.2-0.20221108105251-f71f283feaa5 h1:qgxeoWsMBTgfa1DZOBD0KumvmhCBuLf9me4/Mcu1WzY=
 github.com/networkservicemesh/api v1.6.2-0.20221108105251-f71f283feaa5/go.mod h1:hOF2844BSstH1311oDMDgqqXS+kdc77htZNPRKl9mf8=
-github.com/networkservicemesh/sdk v0.5.1-0.20221108114500-e51c7ad0404f h1:BxZ7OIrqZW2afI8ls9KMoDHx+Y5VhrpL1bjFOt5z5jc=
-github.com/networkservicemesh/sdk v0.5.1-0.20221108114500-e51c7ad0404f/go.mod h1:R8RssOQQngiDgmX+DzO7X43Ye4xSfNdc2asv27qewKY=
-github.com/networkservicemesh/sdk-kernel v0.0.0-20221108115311-a19d97e96552 h1:lO1VOOI2gTNVWetnWtgWaMBgKJWlJb3bHHCR8tVyqR4=
-github.com/networkservicemesh/sdk-kernel v0.0.0-20221108115311-a19d97e96552/go.mod h1:86sAzP5Eg8fGvZuav6Ba34hP3jvkpJ99PSDoWkzALjM=
-github.com/networkservicemesh/sdk-vpp v0.0.0-20221119181453-89baf2cc2b3a h1:QHSFo5xtoX7+qe8M2/m8INestN6xB7419L4yWYglEK0=
-github.com/networkservicemesh/sdk-vpp v0.0.0-20221119181453-89baf2cc2b3a/go.mod h1:6CMXGLOMqxIVe806YVaGUWUhFHaneAuffYmSRNDSgb0=
+github.com/networkservicemesh/sdk v0.5.1-0.20221121202637-1d79bf8c68cd h1:hNtKGlvHqas8SQVeSr3YZfb8Bub1Qe6aBZsnKKzYz3w=
+github.com/networkservicemesh/sdk v0.5.1-0.20221121202637-1d79bf8c68cd/go.mod h1:R8RssOQQngiDgmX+DzO7X43Ye4xSfNdc2asv27qewKY=
+github.com/networkservicemesh/sdk-kernel v0.0.0-20221121203710-833d80721775 h1:r/OaoPTIjbU3UBMN/BoLx+iC30hu0jKg5YqvBZeyTjQ=
+github.com/networkservicemesh/sdk-kernel v0.0.0-20221121203710-833d80721775/go.mod h1:hH/s3iEIJ8NyKI1jTrxhbXBi4ASsRkxPfYSsIhL5blw=
+github.com/networkservicemesh/sdk-vpp v0.0.0-20221121204531-fa429122885a h1:HZfCNQpvJIJZBURmyQSlt7CT4CypQP3pFJiQtSMtqwk=
+github.com/networkservicemesh/sdk-vpp v0.0.0-20221121204531-fa429122885a/go.mod h1:1MhWoAdIbPrDosrUxMjDgBJxg4IO+0/ta4cGRz3C2kQ=
 github.com/onsi/ginkgo v1.8.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/gomega v1.1.0 h1:e3YP4dN/HYPpGh29X1ZkcxcEICsOls9huyVCRBaxjq8=
 github.com/onsi/gomega v1.1.0/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
@@ -244,6 +245,8 @@ github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:
 github.com/prometheus/client_model v0.2.0 h1:uq5h0d+GuxiXLJLNABMgp2qUWDPiLvgCzz2dUR+/W/M=
 github.com/prometheus/common v0.37.0 h1:ccBbHCgIiT9uSoFY0vX8H3zsNR5eLt17/RQLUvn8pXE=
 github.com/prometheus/procfs v0.8.0 h1:ODq8ZFEaYeCaZOJlZZdJA2AbQR98dSHSM1KW/You5mo=
+github.com/r3labs/diff v1.1.0 h1:V53xhrbTHrWFWq3gI4b94AjgEJOerO1+1l0xyHOBi8M=
+github.com/r3labs/diff v1.1.0/go.mod h1:7WjXasNzi0vJetRcB/RqNl5dlIsmXcTTLmF5IoH6Xig=
 github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:N/ElC8H3+5XpJzTSTfLsJV/mx9Q9g7kxmchpfZyxgzM=
 github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
