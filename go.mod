@@ -8,8 +8,8 @@ require (
 	github.com/edwarnicke/vpphelper v0.0.0-20210225052320-b4f1f1aff45d
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/networkservicemesh/api v1.6.2-0.20221108105251-f71f283feaa5
-	github.com/networkservicemesh/sdk v0.5.1-0.20221108114500-e51c7ad0404f
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20221119181453-89baf2cc2b3a
+	github.com/networkservicemesh/sdk v0.5.1-0.20221121202637-1d79bf8c68cd
+	github.com/networkservicemesh/sdk-vpp v0.0.0-20221121204531-fa429122885a
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spiffe/go-spiffe/v2 v2.0.0
@@ -33,6 +33,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
@@ -40,8 +41,9 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/lunixbochs/struc v0.0.0-20200521075829-a4cb8d33dbbe // indirect
 	github.com/miekg/dns v1.1.50 // indirect
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20221108115311-a19d97e96552 // indirect
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20221121203710-833d80721775 // indirect
 	github.com/open-policy-agent/opa v0.44.0 // indirect
+	github.com/r3labs/diff v1.1.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.1 // indirect
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
