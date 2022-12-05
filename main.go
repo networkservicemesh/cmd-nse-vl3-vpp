@@ -86,6 +86,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
+	registryauthorize "github.com/networkservicemesh/sdk/pkg/registry/common/authorize"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	"github.com/networkservicemesh/sdk/pkg/tools/dnsconfig"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
@@ -330,13 +331,15 @@ func main() {
 			registryclientinfo.NewNetworkServiceEndpointRegistryClient(),
 			registrysendfd.NewNetworkServiceEndpointRegistryClient(),
 		),
+		registryclient.WithAuthorizeNSERegistryClient(registryauthorize.NewNetworkServiceEndpointRegistryClient()),
 	)
 
 	if config.RegisterService {
 		for _, serviceName := range config.ServiceNames {
 			nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx,
 				registryclient.WithClientURL(&config.ConnectTo),
-				registryclient.WithDialOptions(clientOptions...))
+				registryclient.WithDialOptions(clientOptions...),
+				registryclient.WithAuthorizeNSRegistryClient(registryauthorize.NewNetworkServiceRegistryClient()))
 			_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
 				Name:    serviceName,
 				Payload: payload.IP,
