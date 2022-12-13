@@ -468,7 +468,6 @@ func main() {
 	// wait for server to exit
 	<-signalCtx.Done()
 	closeSubscribedChannels()
-	<-vppErrCh
 }
 
 func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
