@@ -504,7 +504,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 				routes.NewClient(vppConn),
 				unnumbered.NewClient(vppConn, loopback.Load),
 				vrf.NewClient(vppConn, vrfOpts...),
-				memif.NewClient(vppConn),
+				memif.NewClient(ctx, vppConn),
 				sendfd.NewClient(),
 				recvfd.NewClient(),
 			)...,
