@@ -97,22 +97,23 @@ import (
 
 // Config holds configuration parameters from environment variables
 type Config struct {
-	Name                  string            `default:"vL3-server" desc:"Name of vL3 Server"`
-	DialTimeout           time.Duration     `default:"5s" desc:"timeout to dial NSMgr" split_words:"true"`
-	RequestTimeout        time.Duration     `default:"15s" desc:"timeout to request NSE" split_words:"true"`
-	ListenOn              string            `default:"listen.on.sock" desc:"listen on socket" split_words:"true"`
-	ConnectTo             url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
-	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
-	ServiceNames          []string          `default:"vL3" desc:"Name of providing service" split_words:"true"`
-	Labels                map[string]string `default:"" desc:"Endpoint labels"`
-	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
-	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
-	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
-	PrefixServerURL       url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
-	DNSTemplates          []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
-	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
-	getDNSServerIP        func() net.IP
-	dnsConfigs            dnsconfig.Map
+	Name                   string            `default:"vL3-server" desc:"Name of vL3 Server"`
+	DialTimeout            time.Duration     `default:"5s" desc:"timeout to dial NSMgr" split_words:"true"`
+	RequestTimeout         time.Duration     `default:"15s" desc:"timeout to request NSE" split_words:"true"`
+	ListenOn               string            `default:"listen.on.sock" desc:"listen on socket" split_words:"true"`
+	ConnectTo              url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
+	MaxTokenLifetime       time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
+	RegistryClientPolicies []string          `default:"etc/nsm/opa/common/.*.rego,etc/nsm/opa/registry/.*.rego,etc/nsm/opa/client/.*.rego" desc:"paths to files and directories that contain registry client policies" split_words:"true"`
+	ServiceNames           []string          `default:"vL3" desc:"Name of providing service" split_words:"true"`
+	Labels                 map[string]string `default:"" desc:"Endpoint labels"`
+	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
+	RegisterService        bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
+	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	PrefixServerURL        url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
+	DNSTemplates           []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
+	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
+	getDNSServerIP         func() net.IP
+	dnsConfigs             dnsconfig.Map
 }
 
 // Process prints and processes env to config
@@ -331,7 +332,9 @@ func main() {
 			registryclientinfo.NewNetworkServiceEndpointRegistryClient(),
 			registrysendfd.NewNetworkServiceEndpointRegistryClient(),
 		),
-		registryclient.WithAuthorizeNSERegistryClient(registryauthorize.NewNetworkServiceEndpointRegistryClient()),
+		registryclient.WithAuthorizeNSERegistryClient(registryauthorize.NewNetworkServiceEndpointRegistryClient(
+			registryauthorize.WithPolicies(config.RegistryClientPolicies...),
+		)),
 	)
 
 	if config.RegisterService {
@@ -339,7 +342,9 @@ func main() {
 			nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx,
 				registryclient.WithClientURL(&config.ConnectTo),
 				registryclient.WithDialOptions(clientOptions...),
-				registryclient.WithAuthorizeNSRegistryClient(registryauthorize.NewNetworkServiceRegistryClient()))
+				registryclient.WithAuthorizeNSRegistryClient(registryauthorize.NewNetworkServiceRegistryClient(
+					registryauthorize.WithPolicies(config.RegistryClientPolicies...),
+				)))
 			_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
 				Name:    serviceName,
 				Payload: payload.IP,
