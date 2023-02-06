@@ -64,7 +64,6 @@ import (
 	_ "os"
 	_ "os/signal"
 	_ "path/filepath"
-	_ "sync/atomic"
 	_ "syscall"
 	_ "time"
 )
