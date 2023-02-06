@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Cisco and/or its affiliates.
+// Copyright (c) 2022-2023 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -28,7 +28,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -112,7 +111,8 @@ type Config struct {
 	PrefixServerURL        url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
 	DNSTemplates           []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
-	getDNSServerIP         func() net.IP
+	dnsServerAddr          net.IP
+	dnsServerAddrCh        chan net.IP
 	dnsConfigs             dnsconfig.Map
 }
 
@@ -214,13 +214,7 @@ func main() {
 	logrus.SetLevel(level)
 	logrus.SetFormatter(&nested.Formatter{})
 
-	var dnsServerIP = new(atomic.Value)
-	config.getDNSServerIP = func() net.IP {
-		if ip := dnsServerIP.Load(); ip != nil {
-			return ip.(net.IP)
-		}
-		return nil
-	}
+	config.dnsServerAddrCh = make(chan net.IP, 1)
 
 	// ********************************************************************************
 	// Configure Open Telemetry
@@ -433,7 +427,8 @@ func main() {
 		_, _ = nsmClient.Close(closeCtx, conn)
 	}(conn)
 
-	dnsServerIP.Store(conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP)
+	config.dnsServerAddr = conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP
+	config.dnsServerAddrCh <- conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP
 
 	vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[clientSubscriptionIdx], clientAdditionalFunctionality...)
 	for _, nse := range nseList {
@@ -500,7 +495,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			append(
 				clientAdditionalFunctionality,
 				vl3.NewClient(ctx, prefixCh),
-				vl3dns.NewClient(config.getDNSServerIP(), &config.dnsConfigs),
+				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 				ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 				loopback.NewClient(vppConn, loopOpts...),
@@ -531,7 +526,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 		endpoint.WithAdditionalFunctionality(
 			onidle.NewServer(ctx, cancel, config.IdleTimeout),
 			vl3dns.NewServer(ctx,
-				config.getDNSServerIP,
+				config.dnsServerAddrCh,
 				vl3dns.WithDomainSchemes(config.DNSTemplates...),
 				vl3dns.WithConfigs(&config.dnsConfigs),
 			),
