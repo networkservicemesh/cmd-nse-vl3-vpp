@@ -4,12 +4,13 @@ go 1.18
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
+	github.com/edwarnicke/genericsync v0.0.0-20220910010113-61a344f9bc29
 	github.com/edwarnicke/grpcfd v1.1.2
 	github.com/edwarnicke/vpphelper v0.0.0-20210225052320-b4f1f1aff45d
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/networkservicemesh/api v1.7.2-0.20230123083145-4a6c3ec589e1
-	github.com/networkservicemesh/sdk v0.5.1-0.20230213134519-3aa9aa0d5e1b
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20230213142924-f83ab06a3e97
+	github.com/networkservicemesh/sdk v0.5.1-0.20230220110548-26b7ec8d44f2
+	github.com/networkservicemesh/sdk-vpp v0.0.0-20230220095933-cfada7063631
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spiffe/go-spiffe/v2 v2.0.0
@@ -41,7 +42,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/lunixbochs/struc v0.0.0-20200521075829-a4cb8d33dbbe // indirect
 	github.com/miekg/dns v1.1.50 // indirect
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20230213141018-c280bc6ee279 // indirect
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20230220094641-02169645d09e // indirect
 	github.com/open-policy-agent/opa v0.44.0 // indirect
 	github.com/r3labs/diff v1.1.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect

@@ -61,6 +61,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/tracing"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
+	"github.com/edwarnicke/genericsync"
 	"github.com/edwarnicke/grpcfd"
 	"github.com/edwarnicke/vpphelper"
 	"github.com/kelseyhightower/envconfig"
@@ -87,7 +88,6 @@ import (
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
 	registryauthorize "github.com/networkservicemesh/sdk/pkg/registry/common/authorize"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
-	"github.com/networkservicemesh/sdk/pkg/tools/dnsconfig"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
@@ -113,7 +113,7 @@ type Config struct {
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
 	dnsServerAddr          net.IP
 	dnsServerAddrCh        chan net.IP
-	dnsConfigs             dnsconfig.Map
+	dnsConfigs             genericsync.Map[string, []*networkservice.DNSConfig]
 }
 
 // Process prints and processes env to config
