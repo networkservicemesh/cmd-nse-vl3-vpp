@@ -303,7 +303,7 @@ func main() {
 	nsmClient := retry.NewClient(
 		client.NewClient(ctx,
 			client.WithClientURL(&config.ConnectTo),
-			client.WithName(config.Name+"-kernel"),
+			client.WithName(config.Name),
 			client.WithAuthorizeClient(authorize.NewClient()),
 			client.WithAdditionalFunctionality(
 				append(
