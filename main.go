@@ -130,12 +130,25 @@ func (c *Config) Process() error {
 func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, subscriptions []chan *ipam.PrefixResponse) {
 	var previousResponse *ipam.PrefixResponse
 	go func() {
-		for ; ctx.Err() == nil; time.Sleep(time.Millisecond * 200) {
-			cc, err := grpc.DialContext(ctx, grpcutils.URLToTarget(&c.PrefixServerURL), grpc.WithTransportCredentials(
-				credentials.NewTLS(
-					tlsClientConfig,
+		var cc *grpc.ClientConn
+		var err error
+		for ctx.Err() == nil {
+			// Close the previous clientConn
+			if cc != nil {
+				_ = cc.Close()
+			}
+			dialCtx, dialCtxCancel := context.WithTimeout(ctx, time.Millisecond*200)
+			cc, err = grpc.DialContext(dialCtx,
+				grpcutils.URLToTarget(&c.PrefixServerURL),
+				grpc.WithBlock(),
+				grpc.WithTransportCredentials(
+					credentials.NewTLS(
+						tlsClientConfig,
+					),
 				),
-			))
+			)
+			// It is safe to cancel dial ctx after DialContext if WithBlock() option is used
+			dialCtxCancel()
 			if err != nil {
 				logrus.Error(err.Error())
 				continue
