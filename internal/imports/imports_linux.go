@@ -58,7 +58,6 @@ import (
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
 	_ "google.golang.org/protobuf/proto"
-	_ "io/ioutil"
 	_ "net"
 	_ "net/url"
 	_ "os"
