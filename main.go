@@ -63,7 +63,6 @@ import (
 	"github.com/edwarnicke/genericsync"
 	"github.com/edwarnicke/grpcfd"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/networkservicemesh/vpphelper"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
@@ -71,6 +70,8 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/networkservicemesh/vpphelper"
 
 	"github.com/networkservicemesh/api/pkg/api/ipam"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
