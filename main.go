@@ -62,7 +62,7 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/edwarnicke/genericsync"
 	"github.com/edwarnicke/grpcfd"
-	"github.com/edwarnicke/vpphelper"
+	"github.com/networkservicemesh/vpphelper"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
