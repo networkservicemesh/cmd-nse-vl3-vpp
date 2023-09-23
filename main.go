@@ -105,6 +105,7 @@ type Config struct {
 	RegistryClientPolicies []string          `default:"etc/nsm/opa/common/.*.rego,etc/nsm/opa/registry/.*.rego,etc/nsm/opa/client/.*.rego" desc:"paths to files and directories that contain registry client policies" split_words:"true"`
 	ServiceNames           []string          `default:"vL3" desc:"Name of providing service" split_words:"true"`
 	Labels                 map[string]string `default:"" desc:"Endpoint labels"`
+	RequestLabels          map[string]string `default:"" desc:"Adds labels to request on requesting vl3 nse"`
 	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	RegisterService        bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
@@ -427,6 +428,7 @@ func main() {
 			NetworkServiceEndpointName: config.Name,
 			NetworkService:             config.ServiceNames[0],
 			Payload:                    payload.IP,
+			Labels:                     config.RequestLabels,
 		},
 	})
 
@@ -459,6 +461,7 @@ func main() {
 				NetworkServiceEndpointName: nse.Name,
 				NetworkService:             config.ServiceNames[0],
 				Payload:                    payload.IP,
+				Labels:                     config.RequestLabels,
 			},
 		}
 
