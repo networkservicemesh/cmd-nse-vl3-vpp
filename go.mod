@@ -29,6 +29,7 @@ require (
 	github.com/edwarnicke/log v1.0.0 // indirect
 	github.com/edwarnicke/serialize v1.0.7 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/ftrvxmtrx/fd v0.0.0-20150925145434-c6d800382fff // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

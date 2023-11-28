@@ -39,6 +39,7 @@ import (
 
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/stats"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
@@ -554,6 +555,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 			unnumbered.NewServer(vppConn, loopback.Load),
 			vrf.NewServer(vppConn, vrfOpts...),
 			loopback.NewServer(vppConn, loopOpts...),
+			stats.NewServer(ctx, vppConn, stats.InterfaceOnly(true)),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
 				memif.MECHANISM: chain.NewNetworkServiceServer(
 					sendfd.NewServer(),

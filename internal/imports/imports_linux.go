@@ -18,6 +18,7 @@ import (
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/mtu"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
+	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/stats"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
