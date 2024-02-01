@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -44,6 +45,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/nsemonitor"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
@@ -108,6 +110,7 @@ type Config struct {
 	RequestLabels          map[string]string `default:"" desc:"Adds labels to request on requesting vl3 nse" split_words:"true"`
 	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	RegisterService        bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
+	UnregisterItself       bool              `default:"true" desc:"if true then NSE unregister itself when it completes working" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	MetricsExportInterval  time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	PrefixServerURL        url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
@@ -482,6 +485,15 @@ func main() {
 		}()
 	}
 
+	if config.UnregisterItself {
+		defer func() {
+			_, err = nseRegistryClient.Unregister(context.Background(), nseRegistration)
+			if err != nil {
+				log.FromContext(ctx).Errorf("nse failed to unregister itself on termination: %s", err.Error())
+			}
+		}()
+	}
+
 	// wait for server to exit
 	<-signalCtx.Done()
 	closeSubscribedChannels()
@@ -504,6 +516,12 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			),
 		),
 	)
+
+	cc, err := grpc.DialContext(ctx, config.ConnectTo.String(), dialOptions...)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to NSM registry: %s", err.Error()))
+	}
+
 	c := client.NewClient(
 		ctx,
 		client.WithClientURL(&config.ConnectTo),
@@ -511,6 +529,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
+				nsemonitor.NewClient(ctx, registryapi.NewNetworkServiceEndpointRegistryClient(cc)),
 				vl3.NewClient(ctx, prefixCh),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
