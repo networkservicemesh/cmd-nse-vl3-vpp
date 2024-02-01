@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2023 Cisco and/or its affiliates.
+// Copyright (c) 2022-2024 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -470,7 +470,7 @@ func main() {
 		requestCtx, cancelRequest = context.WithTimeout(signalCtx, config.RequestTimeout)
 		defer cancelRequest()
 
-		conn, err := vl3Client.Request(requestCtx, request)
+		conn, err = vl3Client.Request(requestCtx, request)
 		if err != nil {
 			log.FromContext(ctx).Errorf("request has failed: %v", err.Error())
 			continue
