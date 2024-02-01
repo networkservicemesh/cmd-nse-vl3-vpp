@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2023 Cisco and/or its affiliates.
+// Copyright (c) 2022-2024 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -108,6 +108,7 @@ type Config struct {
 	RequestLabels          map[string]string `default:"" desc:"Adds labels to request on requesting vl3 nse" split_words:"true"`
 	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	RegisterService        bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
+	UnregisterItself       bool              `default:"true" desc:"if true then NSE unregister itself when it completes working" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	MetricsExportInterval  time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	PrefixServerURL        url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
@@ -469,7 +470,7 @@ func main() {
 		requestCtx, cancelRequest = context.WithTimeout(signalCtx, config.RequestTimeout)
 		defer cancelRequest()
 
-		conn, err := vl3Client.Request(requestCtx, request)
+		conn, err = vl3Client.Request(requestCtx, request)
 		if err != nil {
 			log.FromContext(ctx).Errorf("request has failed: %v", err.Error())
 			continue
@@ -479,6 +480,15 @@ func main() {
 			closeCtx, cancelClose := context.WithTimeout(ctx, config.RequestTimeout)
 			defer cancelClose()
 			_, _ = vl3Client.Close(closeCtx, conn)
+		}()
+	}
+
+	if config.UnregisterItself {
+		defer func() {
+			_, err = nseRegistryClient.Unregister(context.Background(), nseRegistration)
+			if err != nil {
+				log.FromContext(ctx).Errorf("nse failed to unregister itself on termination: %s", err.Error())
+			}
 		}()
 	}
 
