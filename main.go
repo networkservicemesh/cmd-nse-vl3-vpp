@@ -22,7 +22,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -45,7 +44,6 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/nsemonitor"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
@@ -516,12 +514,6 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			),
 		),
 	)
-
-	cc, err := grpc.DialContext(ctx, config.ConnectTo.String(), dialOptions...)
-	if err != nil {
-		panic(fmt.Sprintf("failed to connect to NSM registry: %s", err.Error()))
-	}
-
 	c := client.NewClient(
 		ctx,
 		client.WithClientURL(&config.ConnectTo),
@@ -529,7 +521,6 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
-				nsemonitor.NewClient(ctx, registryapi.NewNetworkServiceEndpointRegistryClient(cc)),
 				vl3.NewClient(ctx, prefixCh),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
