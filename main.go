@@ -111,7 +111,7 @@ type Config struct {
 	UnregisterItself       bool              `default:"true" desc:"if true then NSE unregister itself when it completes working" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	MetricsExportInterval  time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
-	PrefixServerURL        url.URL           `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server" split_words:"true"`
+	PrefixServerURL        []url.URL         `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server(s)" split_words:"true"`
 	DNSTemplates           []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
 	dnsServerAddr          net.IP
@@ -130,70 +130,63 @@ func (c *Config) Process() error {
 	return nil
 }
 
-func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, subscriptions []chan *ipam.PrefixResponse) {
-	var previousResponse *ipam.PrefixResponse
-	go func() {
-		var cc *grpc.ClientConn
-		var err error
-		for ctx.Err() == nil {
-			// Close the previous clientConn
-			if cc != nil {
-				_ = cc.Close()
-			}
-			dialCtx, dialCtxCancel := context.WithTimeout(ctx, time.Millisecond*200)
-			cc, err = grpc.DialContext(dialCtx,
-				grpcutils.URLToTarget(&c.PrefixServerURL),
-				grpc.WithBlock(),
-				grpc.WithTransportCredentials(
-					credentials.NewTLS(
-						tlsClientConfig,
+func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, serverSubscriptions []chan *ipam.PrefixResponse, clientSubscriptions []chan *ipam.PrefixResponse) {
+	for i, prefixServerURL := range c.PrefixServerURL {
+		go func(i int, prefixServerURL url.URL) {
+			log.FromContext(ctx).Infof("Start listening prefix server %d: %s", i, prefixServerURL)
+			var previousResponse *ipam.PrefixResponse
+			var cc *grpc.ClientConn
+			var err error
+			for ctx.Err() == nil {
+				// Close the previous clientConn
+				if cc != nil {
+					_ = cc.Close()
+				}
+				dialCtx, dialCtxCancel := context.WithTimeout(ctx, time.Millisecond*200)
+				cc, err = grpc.DialContext(dialCtx,
+					grpcutils.URLToTarget(&prefixServerURL),
+					grpc.WithBlock(),
+					grpc.WithTransportCredentials(
+						credentials.NewTLS(
+							tlsClientConfig,
+						),
 					),
-				),
-			)
-			// It is safe to cancel dial ctx after DialContext if WithBlock() option is used
-			dialCtxCancel()
-			if err != nil {
-				logrus.Error(err.Error())
-				continue
-			}
+				)
+				// It is safe to cancel dial ctx after DialContext if WithBlock() option is used
+				dialCtxCancel()
+				if err != nil {
+					logrus.Error(err.Error())
+					continue
+				}
 
-			managePrefixClient, err := ipam.NewIPAMClient(cc).ManagePrefixes(ctx)
-			if err != nil {
-				logrus.Error(err.Error())
-				continue
-			}
+				managePrefixClient, err := ipam.NewIPAMClient(cc).ManagePrefixes(ctx)
+				if err != nil {
+					logrus.Error(err.Error())
+					continue
+				}
 
-			request := &ipam.PrefixRequest{
-				Type:   ipam.Type_ALLOCATE,
-				Prefix: previousResponse.GetPrefix(),
-			}
+				request := &ipam.PrefixRequest{
+					Type:   ipam.Type_ALLOCATE,
+					Prefix: previousResponse.GetPrefix(),
+				}
 
-			err = managePrefixClient.Send(request)
+				err = managePrefixClient.Send(request)
 
-			if err != nil {
-				continue
-			}
+				if err != nil {
+					continue
+				}
 
-			for resp, recvErr := managePrefixClient.Recv(); recvErr == nil; resp, recvErr = managePrefixClient.Recv() {
-				if !proto.Equal(previousResponse, resp) {
-					previousResponse = resp
-					for _, sub := range subscriptions {
-						select {
-						case sub <- resp:
-						default:
-						}
+				for resp, recvErr := managePrefixClient.Recv(); recvErr == nil; resp, recvErr = managePrefixClient.Recv() {
+					if !proto.Equal(previousResponse, resp) {
+						previousResponse = resp
+						serverSubscriptions[i] <- resp
+						clientSubscriptions[i] <- resp
 					}
 				}
 			}
-		}
-	}()
+		}(i, prefixServerURL)
+	}
 }
-
-const (
-	serverSubscriptionIdx = iota
-	clientSubscriptionIdx
-	totalSubscriptions
-)
 
 func main() {
 	// ********************************************************************************
@@ -373,21 +366,25 @@ func main() {
 	listenOn := &(url.URL{Scheme: "unix", Path: filepath.Join(tmpDir, config.ListenOn)})
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 6.2: create and register nse with nsm")
+	log.FromContext(ctx).Infof("executing phase 6: create and register nse with nsm")
 	// ********************************************************************************
 
-	var subscribedChannels []chan *ipam.PrefixResponse
-	for i := 0; i < totalSubscriptions; i++ {
-		subscribedChannels = append(subscribedChannels, make(chan *ipam.PrefixResponse, 1))
+	prefixServerCount := len(config.PrefixServerURL)
+	var serverSubscriptions []chan *ipam.PrefixResponse
+	var clientSubscriptions []chan *ipam.PrefixResponse
+	for i := 0; i < prefixServerCount; i++ {
+		serverSubscriptions = append(serverSubscriptions, make(chan *ipam.PrefixResponse, 1))
+		clientSubscriptions = append(clientSubscriptions, make(chan *ipam.PrefixResponse, 1))
 	}
 	var closeSubscribedChannels = func() {
-		for i := 0; i < totalSubscriptions; i++ {
-			close(subscribedChannels[i])
+		for i := 0; i < prefixServerCount; i++ {
+			close(serverSubscriptions[i])
+			close(clientSubscriptions[i])
 		}
 	}
-	startListenPrefixes(ctx, config, tlsClientConfig, subscribedChannels)
+	startListenPrefixes(ctx, config, tlsClientConfig, serverSubscriptions, clientSubscriptions)
 
-	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, subscribedChannels[serverSubscriptionIdx])
+	server := createVl3Endpoint(ctx, cancel, config, vppConn, tlsServerConfig, source, loopOptions, vrfOptions, serverSubscriptions)
 
 	srvErrCh := grpcutils.ListenAndServe(ctx, listenOn, server)
 	exitOnErr(ctx, cancel, srvErrCh)
@@ -447,7 +444,7 @@ func main() {
 	config.dnsServerAddr = conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP
 	config.dnsServerAddrCh <- conn.GetContext().GetIpContext().GetSrcIPNets()[0].IP
 
-	vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, subscribedChannels[clientSubscriptionIdx], clientAdditionalFunctionality...)
+	vl3Client := createVl3Client(ctx, config, vppConn, tlsClientConfig, source, loopOptions, vrfOptions, clientSubscriptions, clientAdditionalFunctionality...)
 	for _, nse := range nseList {
 		if nse.Name == config.Name {
 			continue
@@ -498,7 +495,7 @@ func main() {
 }
 
 func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
-	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse, clientAdditionalFunctionality ...networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
+	loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixChs []chan *ipam.PrefixResponse, clientAdditionalFunctionality ...networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
 	dialOptions := append(tracing.WithTracingDial(),
 		grpcfd.WithChainStreamInterceptor(),
 		grpcfd.WithChainUnaryInterceptor(),
@@ -521,7 +518,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
-				vl3.NewClient(ctx, prefixCh),
+				vl3.NewDualstackClient(ctx, prefixChs),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 				ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
@@ -545,7 +542,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 }
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
-	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
+	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixChs []chan *ipam.PrefixResponse) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
@@ -558,7 +555,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 				vl3dns.WithConfigs(&config.dnsConfigs),
 			),
 			vl3mtu.NewServer(),
-			vl3.NewServer(ctx, prefixCh),
+			vl3.NewDualstackServer(ctx, prefixChs),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			unnumbered.NewServer(vppConn, loopback.Load),
