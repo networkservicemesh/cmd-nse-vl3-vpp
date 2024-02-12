@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/routes"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/unnumbered"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/mtu"
+	vppheal "github.com/networkservicemesh/sdk-vpp/pkg/tools/heal"
 
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
@@ -43,8 +45,9 @@ import (
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/heal"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/nsemonitor"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/upstreamrefresh"
@@ -76,6 +79,7 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/ipam"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
+	"github.com/networkservicemesh/api/pkg/api/registry"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
 
@@ -514,6 +518,28 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			),
 		),
 	)
+
+	cc, err := grpc.Dial(config.ConnectTo.String(), dialOptions...)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to the registry: %s", err.Error()))
+	}
+	registryClient := registry.NewNetworkServiceEndpointRegistryClient(cc)
+
+	healClient := heal.NewClient(ctx,
+		heal.WithLivenessCheck(vppheal.VPPLivenessCheck(vppConn)),
+		heal.WithLivenessCheckTimeout(time.Second),
+		heal.WithLivenessCheckInterval(time.Second*2),
+		heal.WithReselectFunc(func(request *networkservice.NetworkServiceRequest) {
+			if request.GetConnection() != nil {
+				request.GetConnection().Mechanism = nil
+				request.GetConnection().Context = nil
+				request.GetConnection().State = networkservice.State_RESELECT_REQUESTED
+				if request.Connection.GetPath() != nil {
+					request.GetConnection().Path.PathSegments = request.Connection.Path.PathSegments[:1]
+				}
+			}
+		}))
+
 	c := client.NewClient(
 		ctx,
 		client.WithClientURL(&config.ConnectTo),
@@ -521,6 +547,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
+				nsemonitor.NewClient(ctx, registryClient),
 				vl3.NewClient(ctx, prefixCh),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
@@ -536,7 +563,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 				recvfd.NewClient(),
 			)...,
 		),
-		client.WithHealClient(null.NewClient()),
+		client.WithHealClient(healClient),
 		client.WithDialTimeout(config.DialTimeout),
 		client.WithDialOptions(dialOptions...),
 	)
