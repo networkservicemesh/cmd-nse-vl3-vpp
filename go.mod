@@ -9,7 +9,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/networkservicemesh/api v1.11.2
 	github.com/networkservicemesh/sdk v0.5.1-0.20240212105149-b1a3e26da857
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20240212110256-22734a67c8e3
+	github.com/networkservicemesh/sdk-vpp v0.0.0-20240220094218-e132a822aad6
 	github.com/networkservicemesh/vpphelper v0.0.0-20240115135903-e2b961f768b6
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
