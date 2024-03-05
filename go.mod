@@ -7,7 +7,7 @@ require (
 	github.com/edwarnicke/genericsync v0.0.0-20220910010113-61a344f9bc29
 	github.com/edwarnicke/grpcfd v1.1.2
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/networkservicemesh/api v1.11.2
+	github.com/networkservicemesh/api v1.12.1-rc.1.0.20240301085602-d5e1eb84eeb4
 	github.com/networkservicemesh/sdk v0.5.1-0.20240212105149-b1a3e26da857
 	github.com/networkservicemesh/sdk-vpp v0.0.0-20240228175616-e7592dedeb7d
 	github.com/networkservicemesh/vpphelper v0.0.0-20240115135903-e2b961f768b6
