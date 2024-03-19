@@ -516,10 +516,10 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		),
 	)
 
-	var ipam vl3.IPAM
+	var clientIpam vl3.IPAM
 	go func() {
 		for prefix := range prefixCh {
-			ipam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+			clientIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
 		}
 	}()
 
@@ -530,7 +530,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
-				vl3.NewClient(ctx, &ipam),
+				vl3.NewClient(ctx, &clientIpam),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 				ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
@@ -555,11 +555,10 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
 	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
-
-	var ipam vl3.IPAM
+	var serverIpam vl3.IPAM
 	go func() {
 		for prefix := range prefixCh {
-			ipam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+			serverIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
 		}
 	}()
 
@@ -575,7 +574,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 				vl3dns.WithConfigs(&config.dnsConfigs),
 			),
 			vl3mtu.NewServer(),
-			strictvl3ipam.NewServer(ctx, vl3.NewServer, &ipam),
+			strictvl3ipam.NewServer(ctx, vl3.NewServer, &serverIpam),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			unnumbered.NewServer(vppConn, loopback.Load),
