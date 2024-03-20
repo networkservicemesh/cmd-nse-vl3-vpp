@@ -41,6 +41,7 @@ import (
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
+	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
@@ -514,6 +515,14 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 			),
 		),
 	)
+
+	var clientIpam vl3.IPAM
+	go func() {
+		for prefix := range prefixCh {
+			clientIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+		}
+	}()
+
 	c := client.NewClient(
 		ctx,
 		client.WithClientURL(&config.ConnectTo),
@@ -521,7 +530,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		client.WithAdditionalFunctionality(
 			append(
 				clientAdditionalFunctionality,
-				vl3.NewClient(ctx, prefixCh),
+				vl3.NewClient(ctx, &clientIpam),
 				vl3dns.NewClient(config.dnsServerAddr, &config.dnsConfigs),
 				up.NewClient(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 				ipaddress.NewClient(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
@@ -546,6 +555,13 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
 	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, prefixCh <-chan *ipam.PrefixResponse) *grpc.Server {
+	var serverIpam vl3.IPAM
+	go func() {
+		for prefix := range prefixCh {
+			serverIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+		}
+	}()
+
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
 		endpoint.WithName(config.Name),
@@ -558,7 +574,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 				vl3dns.WithConfigs(&config.dnsConfigs),
 			),
 			vl3mtu.NewServer(),
-			vl3.NewServer(ctx, prefixCh),
+			strictvl3ipam.NewServer(ctx, vl3.NewServer, &serverIpam),
 			up.NewServer(ctx, vppConn, up.WithLoadSwIfIndex(loopback.Load)),
 			ipaddress.NewServer(vppConn, ipaddress.WithLoadSwIfIndex(loopback.Load)),
 			unnumbered.NewServer(vppConn, loopback.Load),
