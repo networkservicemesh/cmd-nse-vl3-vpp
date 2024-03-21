@@ -21,6 +21,7 @@ import (
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	_ "github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
+	_ "github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/authorize"
