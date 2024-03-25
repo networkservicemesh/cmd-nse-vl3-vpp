@@ -519,7 +519,7 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 	var clientIpam vl3.IPAM
 	go func() {
 		for prefix := range prefixCh {
-			clientIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+			clientIpam.Reset(prefix.Prefix, prefix.ExcludePrefixes...)
 		}
 	}()
 
@@ -558,7 +558,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 	var serverIpam vl3.IPAM
 	go func() {
 		for prefix := range prefixCh {
-			serverIpam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+			serverIpam.Reset(prefix.Prefix, prefix.ExcludePrefixes...)
 		}
 	}()
 
