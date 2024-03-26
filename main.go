@@ -53,6 +53,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/mtu/vl3mtu"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 
 	registryclientinfo "github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
@@ -132,8 +133,9 @@ func (c *Config) Process() error {
 }
 
 func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Config, subscriptions []chan *ipam.PrefixResponse) {
-	for i, prefixServerURL := range c.PrefixServerURL {
-		go func(i int, prefixServerURL url.URL) {
+	for i := range c.PrefixServerURL {
+		prefixServerURL := &c.PrefixServerURL[i]
+		go func(i int, prefixServerURL *url.URL) {
 			log.FromContext(ctx).Infof("Start listening prefix server %d: %s", i, prefixServerURL)
 			var previousResponse *ipam.PrefixResponse
 			var cc *grpc.ClientConn
@@ -145,7 +147,7 @@ func startListenPrefixes(ctx context.Context, c *Config, tlsClientConfig *tls.Co
 				}
 				dialCtx, dialCtxCancel := context.WithTimeout(ctx, time.Millisecond*200)
 				cc, err = grpc.DialContext(dialCtx,
-					grpcutils.URLToTarget(&prefixServerURL),
+					grpcutils.URLToTarget(prefixServerURL),
 					grpc.WithBlock(),
 					grpc.WithTransportCredentials(
 						credentials.NewTLS(
@@ -492,19 +494,25 @@ func main() {
 }
 
 func extractIPAMList(ctx context.Context, subscriptions []chan *ipam.PrefixResponse) []*vl3.IPAM {
-	var ipams []*vl3.IPAM
-	for _, prefixCh := range subscriptions {
-		vl3ipam := vl3.IPAM{}
-		go func(vl3_ipam *vl3.IPAM) {
-			for prefix := range prefixCh {
-				err := vl3_ipam.Reset(prefix.Prefix, prefix.ExcludePrefixes...)
-				if err != nil {
-					log.FromContext(ctx).Errorf("failed to reset vl3 IPAM pool: %s", err.Error())
-				}
-			}
-		}(&vl3ipam)
-		ipams = append(ipams, &vl3ipam)
+	ipams := make([]*vl3.IPAM, len(subscriptions))
+
+	for i := range ipams {
+		ipams[i] = new(vl3.IPAM)
 	}
+
+	handleChannel := func(prefixCh <-chan *ipam.PrefixResponse, ipam *vl3.IPAM) {
+		for prefix := range prefixCh {
+			err := ipam.Reset(prefix.Prefix, prefix.ExcludePrefixes...)
+			if err != nil {
+				log.FromContext(ctx).Errorf("failed to reset vl3 IPAM pool: %s", err.Error())
+			}
+		}
+	}
+
+	for i, ch := range subscriptions {
+		go handleChannel(ch, ipams[i])
+	}
+
 	return ipams
 }
 
@@ -561,7 +569,7 @@ func newMultiIPAMClient(ctx context.Context, ipams []*vl3.IPAM) networkservice.N
 	for _, ipam := range ipams {
 		clients = append(clients, vl3.NewClient(ctx, ipam))
 	}
-	return chain.NewNetworkServiceClient(clients...)
+	return next.NewNetworkServiceClient(clients...)
 }
 
 func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
