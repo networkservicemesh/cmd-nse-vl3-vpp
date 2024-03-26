@@ -494,12 +494,15 @@ func main() {
 func extractIPAMList(ctx context.Context, subscriptions []chan *ipam.PrefixResponse) []*vl3.IPAM {
 	var ipams []*vl3.IPAM
 	for _, prefixCh := range subscriptions {
-		var vl3ipam vl3.IPAM
-		go func() {
+		vl3ipam := vl3.IPAM{}
+		go func(vl3_ipam *vl3.IPAM) {
 			for prefix := range prefixCh {
-				vl3ipam.Reset(ctx, prefix.Prefix, prefix.ExcludePrefixes)
+				err := vl3_ipam.Reset(prefix.Prefix, prefix.ExcludePrefixes...)
+				if err != nil {
+					log.FromContext(ctx).Errorf("failed to reset vl3 IPAM pool: %s", err.Error())
+				}
 			}
-		}()
+		}(&vl3ipam)
 		ipams = append(ipams, &vl3ipam)
 	}
 	return ipams
