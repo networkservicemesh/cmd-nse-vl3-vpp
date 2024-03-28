@@ -46,7 +46,7 @@ require (
 	github.com/lunixbochs/struc v0.0.0-20200707160740-784aaebc1d40 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
-	github.com/networkservicemesh/govpp v0.0.0-20240312165607-3c0a753ca3bf // indirect
+	github.com/networkservicemesh/govpp v0.0.0-20240328101142-8a444680fbba // indirect
 	github.com/networkservicemesh/sdk-kernel v0.0.0-20240326083346-1d10c9cb2ab9 // indirect
 	github.com/open-policy-agent/opa v0.44.0 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
