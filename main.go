@@ -111,7 +111,7 @@ type Config struct {
 	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	RegisterService        bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
 	UnregisterItself       bool              `default:"true" desc:"if true then NSE unregister itself when it completes working" split_words:"true"`
-	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint" split_words:"true"`
 	MetricsExportInterval  time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	PrefixServerURL        []url.URL         `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server(s)" split_words:"true"`
 	DNSTemplates           []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
