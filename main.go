@@ -301,9 +301,7 @@ func main() {
 		),
 		grpc.WithTransportCredentials(
 			grpcfd.TransportCredentials(
-				credentials.NewTLS(
-					tlsClientConfig,
-				),
+				credentials.NewTLS(tlsClientConfig),
 			),
 		),
 	)
