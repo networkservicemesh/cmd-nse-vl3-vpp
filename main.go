@@ -39,6 +39,7 @@ import (
 
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/metrics"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
 	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
@@ -77,6 +78,7 @@ import (
 
 	"github.com/networkservicemesh/api/pkg/api/ipam"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
@@ -321,7 +323,9 @@ func main() {
 					clientAdditionalFunctionality,
 					clientinfo.NewClient(),
 					kernelsdk.NewClient(),
-					sendfd.NewClient(),
+					mechanisms.NewClient(map[string]networkservice.NetworkServiceClient{
+						kernelmech.MECHANISM: sendfd.NewClient(),
+					}),
 				)...,
 			),
 			client.WithDialTimeout(config.DialTimeout),
@@ -551,8 +555,11 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 				routes.NewClient(vppConn),
 				unnumbered.NewClient(vppConn, loopback.Load),
 				vrf.NewClient(vppConn, vrfOpts...),
+				metrics.NewClient(ctx, vppConn),
 				memif.NewClient(ctx, vppConn),
-				sendfd.NewClient(),
+				mechanisms.NewClient(map[string]networkservice.NetworkServiceClient{
+					memif.MECHANISM: sendfd.NewClient(),
+				}),
 				recvfd.NewClient(),
 			)...,
 		),
@@ -592,6 +599,7 @@ func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *C
 			unnumbered.NewServer(vppConn, loopback.Load),
 			vrf.NewServer(vppConn, vrfOpts...),
 			loopback.NewServer(vppConn, loopOpts...),
+			metrics.NewServer(ctx, vppConn),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
 				memif.MECHANISM: chain.NewNetworkServiceServer(
 					sendfd.NewServer(),
