@@ -44,6 +44,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/heal"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
@@ -300,9 +301,7 @@ func main() {
 		),
 		grpc.WithTransportCredentials(
 			grpcfd.TransportCredentials(
-				credentials.NewTLS(
-					tlsClientConfig,
-				),
+				credentials.NewTLS(tlsClientConfig),
 			),
 		),
 	)
@@ -316,6 +315,7 @@ func main() {
 			client.WithClientURL(&config.ConnectTo),
 			client.WithName(config.Name),
 			client.WithAuthorizeClient(authorize.NewClient()),
+			client.WithHealClient(heal.NewClient(ctx)),
 			client.WithAdditionalFunctionality(
 				append(
 					clientAdditionalFunctionality,
