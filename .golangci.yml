@@ -36,8 +36,8 @@ linters-settings:
   dupl:
     threshold: 150
   funlen:
-    Lines: 300
-    Statements: 125
+    Lines: 320
+    Statements: 130
   goconst:
     min-len: 2
     min-occurrences: 2

@@ -38,6 +38,8 @@ docker build .
 * `NSM_PREFIX_SERVER_URL`        - URL to VL3 IPAM server(s) (default: "vl3-ipam:5006")
 * `NSM_DNS_TEMPLATES`            - Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network (default: "{{ index .Labels "podName" }}.{{ .NetworkService }}.")
 * `NSM_LOG_LEVEL`                - Log level (default: "INFO")
+* `NSM_PPROF_ENABLED`            - is pprof enabled (default: "false")
+* `NSM_PPROF_LISTEN_ON`          - pprof URL to ListenAndServe (default: "localhost:6060")
 
 # Testing
 
