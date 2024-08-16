@@ -94,6 +94,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
+	"github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/spiffejwt"
 )
 
@@ -117,6 +118,8 @@ type Config struct {
 	PrefixServerURL        []url.URL         `default:"vl3-ipam:5006" desc:"URL to VL3 IPAM server(s)" split_words:"true"`
 	DNSTemplates           []string          `default:"{{ index .Labels \"podName\" }}.{{ .NetworkService }}." desc:"Represents domain naming templates in go-template format. It is using for generating the domain name for each nse/nsc in the vl3 network" split_words:"true"`
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
+	PprofEnabled           bool              `default:"false" desc:"is pprof enabled" split_words:"true"`
+	PprofListenOn          string            `default:"localhost:6060" desc:"pprof URL to ListenAndServe" split_words:"true"`
 	dnsServerAddr          net.IP
 	dnsServerAddrCh        chan net.IP
 	dnsConfigs             genericsync.Map[string, []*networkservice.DNSConfig]
@@ -241,6 +244,13 @@ func main() {
 				logrus.Error(err.Error())
 			}
 		}()
+	}
+
+	// ********************************************************************************
+	// Configure pprof
+	// ********************************************************************************
+	if config.PprofEnabled {
+		go pprofutils.ListenAndServe(ctx, config.PprofListenOn)
 	}
 
 	log.FromContext(ctx).Infof("Config: %#v", config)
