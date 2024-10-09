@@ -228,6 +228,10 @@ func main() {
 	}
 	logrus.SetLevel(level)
 	logrus.SetFormatter(&nested.Formatter{})
+	logruslogger.SetupLevelChangeOnSignal(ctx, map[os.Signal]logrus.Level{
+		syscall.SIGUSR1: logrus.TraceLevel,
+		syscall.SIGUSR2: level,
+	})
 
 	config.dnsServerAddrCh = make(chan net.IP, 1)
 
