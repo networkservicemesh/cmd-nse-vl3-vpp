@@ -43,10 +43,10 @@ import (
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
 	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/begin"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/heal"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/upstreamrefresh"
@@ -96,6 +96,8 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
 	"github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/spiffejwt"
+
+	vppheal "github.com/networkservicemesh/sdk-vpp/pkg/tools/heal"
 )
 
 // Config holds configuration parameters from environment variables
@@ -120,9 +122,14 @@ type Config struct {
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
 	PprofEnabled           bool              `default:"false" desc:"is pprof enabled" split_words:"true"`
 	PprofListenOn          string            `default:"localhost:6060" desc:"pprof URL to ListenAndServe" split_words:"true"`
-	dnsServerAddr          net.IP
-	dnsServerAddrCh        chan net.IP
-	dnsConfigs             genericsync.Map[string, []*networkservice.DNSConfig]
+
+	LivenessCheckEnabled  bool          `default:"true" desc:"Dataplane liveness check enabled/disabled" split_words:"true"`
+	LivenessCheckInterval time.Duration `default:"1200ms" desc:"Dataplane liveness check interval" split_words:"true"`
+	LivenessCheckTimeout  time.Duration `default:"1s" desc:"Dataplane liveness check timeout" split_words:"true"`
+
+	dnsServerAddr   net.IP
+	dnsServerAddrCh chan net.IP
+	dnsConfigs      genericsync.Map[string, []*networkservice.DNSConfig]
 }
 
 // Process prints and processes env to config
@@ -548,6 +555,13 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 		),
 	)
 
+	var healOptions = []heal.Option{heal.WithLivenessCheckInterval(config.LivenessCheckInterval), heal.WithLivenessCheckTimeout(config.LivenessCheckTimeout)}
+	if config.LivenessCheckEnabled {
+		healOptions = append(healOptions, heal.WithLivenessCheck(vppheal.VPPLivenessCheck(vppConn)))
+	}
+
+	healClient := heal.NewClient(ctx, healOptions...)
+
 	c := client.NewClient(
 		ctx,
 		client.WithClientURL(&config.ConnectTo),
@@ -570,10 +584,10 @@ func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Conn
 				recvfd.NewClient(),
 			)...,
 		),
-		client.WithHealClient(null.NewClient()),
+		client.WithHealClient(healClient),
 		client.WithDialTimeout(config.DialTimeout),
 		client.WithDialOptions(dialOptions...),
-	)
+		client.WithReselectFunc(begin.ReselectWithSameEndpointFunc))
 
 	return retry.NewClient(c)
 }
