@@ -1,4 +1,5 @@
 // Copyright (c) 2022-2024 Cisco and/or its affiliates.
+// Copyright (c) 2025 OpenInfra Foundation Europe.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -30,37 +31,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.fd.io/govpp/api"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/ipaddress"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/routes"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/unnumbered"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/mtu"
-
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
-	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
-	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/begin"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/heal"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/upstreamrefresh"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/mtu/vl3mtu"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
-
-	registryclientinfo "github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
-	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
-	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
-	"github.com/networkservicemesh/sdk/pkg/tools/token"
-	"github.com/networkservicemesh/sdk/pkg/tools/tracing"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/edwarnicke/genericsync"
@@ -74,30 +46,53 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/networkservicemesh/vpphelper"
-
 	"github.com/networkservicemesh/api/pkg/api/ipam"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/ipaddress"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/routes"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/ipcontext/unnumbered"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/connectioncontext/mtu"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/loopback"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/mechanisms/memif"
 	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/tag"
-
-	kernelsdk "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/kernel"
-
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/up"
+	"github.com/networkservicemesh/sdk-vpp/pkg/networkservice/vrf"
+	vppheal "github.com/networkservicemesh/sdk-vpp/pkg/tools/heal"
+	"github.com/networkservicemesh/sdk/pkg/ipam/strictvl3ipam"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/client"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/authorize"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/begin"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/clientinfo"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/heal"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
+	kernelsdk "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/kernel"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/retry"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/upstreamrefresh"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext/vl3dns"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/ipcontext/vl3"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/mtu/vl3mtu"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
 	registryauthorize "github.com/networkservicemesh/sdk/pkg/registry/common/authorize"
+	registryclientinfo "github.com/networkservicemesh/sdk/pkg/registry/common/clientinfo"
+	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
+	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
 	"github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/spiffejwt"
-
-	vppheal "github.com/networkservicemesh/sdk-vpp/pkg/tools/heal"
+	"github.com/networkservicemesh/sdk/pkg/tools/token"
+	"github.com/networkservicemesh/sdk/pkg/tools/tracing"
+	"github.com/networkservicemesh/vpphelper"
 )
 
 // Config holds configuration parameters from environment variables
@@ -537,7 +532,7 @@ func extractIPAMList(ctx context.Context, subscriptions []chan *ipam.PrefixRespo
 	return ipams
 }
 
-func createVl3Client(ctx context.Context, config *Config, vppConn vpphelper.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
+func createVl3Client(ctx context.Context, config *Config, vppConn api.Connection, tlsClientConfig *tls.Config, source x509svid.Source,
 	loopOpts []loopback.Option, vrfOpts []vrf.Option, ipams []*vl3.IPAM, clientAdditionalFunctionality ...networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
 	dialOptions := append(tracing.WithTracingDial(),
 		grpcfd.WithChainStreamInterceptor(),
@@ -600,7 +595,7 @@ func newMultiIPAMClient(ctx context.Context, ipams []*vl3.IPAM) networkservice.N
 	return next.NewNetworkServiceClient(clients...)
 }
 
-func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn vpphelper.Connection, tlsServerConfig *tls.Config,
+func createVl3Endpoint(ctx context.Context, cancel context.CancelFunc, config *Config, vppConn api.Connection, tlsServerConfig *tls.Config,
 	source x509svid.Source, loopOpts []loopback.Option, vrfOpts []vrf.Option, ipams []*vl3.IPAM) *grpc.Server {
 	vl3Endpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
