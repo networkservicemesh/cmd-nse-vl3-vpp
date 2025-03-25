@@ -7,9 +7,9 @@ require (
 	github.com/edwarnicke/genericsync v0.0.0-20220910010113-61a344f9bc29
 	github.com/edwarnicke/grpcfd v1.1.4
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/networkservicemesh/api v1.14.2-rc.1.0.20241209080353-bbb4cd5f8f00
-	github.com/networkservicemesh/sdk v0.5.1-0.20250324141549-1039d22d7eeb
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20250324150940-38844a65de6c
+	github.com/networkservicemesh/api v1.14.4-rc.1
+	github.com/networkservicemesh/sdk v1.14.4-rc.1
+	github.com/networkservicemesh/sdk-vpp v1.14.4-rc.1
 	github.com/networkservicemesh/vpphelper v0.0.0-20250204173511-c366e1dc63af
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
@@ -50,7 +50,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/networkservicemesh/govpp v0.0.0-20250206125319-4d08cb0ae074 // indirect
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20250324144000-40818f46d346 // indirect
+	github.com/networkservicemesh/sdk-kernel v1.14.4-rc.1 // indirect
 	github.com/open-policy-agent/opa v0.44.0 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
