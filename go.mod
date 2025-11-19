@@ -1,6 +1,8 @@
 module github.com/networkservicemesh/cmd-nse-vl3-vpp
 
-go 1.23.8
+go 1.24.0
+
+toolchain go1.24.10
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
@@ -8,8 +10,8 @@ require (
 	github.com/edwarnicke/grpcfd v1.1.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/networkservicemesh/api v1.15.0-rc.1.0.20250625083423-2e0c8496e4e3
-	github.com/networkservicemesh/sdk v0.5.1-0.20250625085623-466f486d183e
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20250716142057-91f48fc84548
+	github.com/networkservicemesh/sdk v0.5.1-0.20251119123020-9b3c88332081
+	github.com/networkservicemesh/sdk-vpp v0.0.0-20251119123842-2f8a12906707
 	github.com/networkservicemesh/vpphelper v0.0.0-20250204173511-c366e1dc63af
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
@@ -19,7 +21,7 @@ require (
 	google.golang.org/protobuf v1.36.6
 )
 
-require golang.org/x/sync v0.12.0 // indirect
+require golang.org/x/sync v0.17.0 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -50,7 +52,7 @@ require (
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/networkservicemesh/govpp v0.0.0-20250206125319-4d08cb0ae074 // indirect
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20250625085850-6a0a3efab3f9 // indirect
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20251119123246-a0e68dfd1478 // indirect
 	github.com/open-policy-agent/opa v1.4.0 // indirect
 	github.com/prometheus/client_golang v1.21.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
@@ -77,12 +79,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
-	golang.org/x/tools v0.26.0 // indirect
+	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/mod v0.28.0 // indirect
+	golang.org/x/net v0.45.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/tools v0.37.0 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
