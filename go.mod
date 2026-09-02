@@ -7,9 +7,9 @@ require (
 	github.com/edwarnicke/genericsync v0.0.0-20220910010113-61a344f9bc29
 	github.com/edwarnicke/grpcfd v1.1.4
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/networkservicemesh/api v1.19.0-rc.1.0.20260824081105-7ccb73c2b1b0
-	github.com/networkservicemesh/sdk v0.5.1-0.20260902133201-8c8366a27a75
-	github.com/networkservicemesh/sdk-vpp v0.0.0-20260902135124-53fe74195037
+	github.com/networkservicemesh/api v1.19.0-rc.1.0.20260902133228-2a1d65bc255c
+	github.com/networkservicemesh/sdk v0.5.1-0.20260902140933-50b0c64456a7
+	github.com/networkservicemesh/sdk-vpp v0.0.0-20260902221535-f1723dd74c1e
 	github.com/networkservicemesh/vpphelper v0.0.0-20250204173511-c366e1dc63af
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.4
@@ -50,7 +50,7 @@ require (
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/networkservicemesh/govpp v0.0.0-20250206125319-4d08cb0ae074 // indirect
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20260902134425-0f930666519b // indirect
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20260902193516-0e4781d8a899 // indirect
 	github.com/open-policy-agent/opa v1.4.0 // indirect
 	github.com/prometheus/client_golang v1.21.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
